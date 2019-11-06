@@ -1,7 +1,7 @@
 use actix_web::{get, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder};
-use serde::Deserialize;
 use diesel::prelude::PgConnection;
 use diesel::r2d2::{self, ConnectionManager};
+use serde::Deserialize;
 
 #[macro_use]
 extern crate diesel;
@@ -40,8 +40,23 @@ fn add_group(json: web::Json<AddGroupData>, pool: web::Data<db::Pool>) -> impl R
 }
 
 #[get("/events")]
-fn get_events() -> impl Responder {
+fn list_events() -> impl Responder {
     HttpResponse::Ok().body("Getting events")
+}
+
+#[post("/events")]
+fn add_event() -> impl Responder {
+    unimplemented!()
+}
+
+#[get("/users")]
+fn list_users() -> impl Responder {
+    unimplemented!()
+}
+
+#[post("/users")]
+fn add_user() -> impl Responder {
+    unimplemented!()
 }
 
 fn main() {
