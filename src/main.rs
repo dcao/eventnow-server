@@ -12,51 +12,120 @@ pub mod schema;
 
 #[get("/groups")]
 fn get_groups(pool: web::Data<db::Pool>) -> impl Responder {
-    match db::groups(&pool.get().unwrap()) {
+    match db::get_all_groups(&pool.get().unwrap()) {
         Ok(gs) => HttpResponse::Ok().json(gs),
         Err(_) => HttpResponse::InternalServerError().into(),
     }
 }
 
-#[derive(Deserialize)]
-struct AddGroupData {
-    name: String,
-    description: String,
+#[post("/groups")]
+fn create_group(pool: web::Data<db::Pool>, json: web::Json<models::NewGroup>) -> impl Responder {
+    match db::create_group(&pool.get().unwrap(), json.0) {
+        Ok(_) => HttpResponse::Created(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
-#[post("/groups")]
-fn add_group(json: web::Json<AddGroupData>, pool: web::Data<db::Pool>) -> impl Responder {
-    let new_group = models::NewGroup {
-        name: &json.name,
-        description: Some(&json.description),
-        cover_img: None,
-        profile_img: None,
+#[get("/groups/{group_id}")]
+fn get_group_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::get_group_by_id(&pool.get().unwrap(), *id) {
+        Ok(g) => HttpResponse::Ok().json(g),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[get("/groups/{group_id}/members")]
+fn get_users_in_group(pool: web::Data<db::Pool>, group_id: web::Path<i32>) -> impl Responder {
+    match db::get_users_in_group(&pool.get().unwrap(), *group_id) {
+        Ok(us) => HttpResponse::Ok().json(us),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+    
+
+#[derive(Deserialize)]
+struct AddGroupMember {
+    pub user_id: i32,
+    pub role: models::GroupRole,
+}
+
+#[post("/groups/{group_id}/members")]
+fn add_group_member(
+    pool: web::Data<db::Pool>,
+    json: web::Json<AddGroupMember>,
+    group_id: web::Path<i32>,
+) -> impl Responder {
+    let nmship = models::NewMembership {
+        group_id: *group_id,
+        user_id: json.0.user_id,
+        membership_role: json.0.role,
     };
 
-    match db::create_group(&pool.get().unwrap(), new_group) {
-        Ok(_) => HttpResponse::Ok(),
+    match db::create_membership(&pool.get().unwrap(), nmship) {
+        Ok(_) => HttpResponse::Created(),
         Err(_) => HttpResponse::InternalServerError().into(),
     }
 }
 
 #[get("/events")]
-fn list_events() -> impl Responder {
-    HttpResponse::Ok().body("Getting events")
+fn get_events(pool: web::Data<db::Pool>) -> impl Responder {
+    match db::get_all_events(&pool.get().unwrap()) {
+        Ok(gs) => HttpResponse::Ok().json(gs),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
 #[post("/events")]
-fn add_event() -> impl Responder {
-    unimplemented!()
+fn create_event(pool: web::Data<db::Pool>, json: web::Json<models::NewEvent>) -> impl Responder {
+    match db::create_event(&pool.get().unwrap(), json.0) {
+        Ok(_) => HttpResponse::Created(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[get("/events/{event_id}")]
+fn get_event_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::get_event_by_id(&pool.get().unwrap(), *id) {
+        Ok(g) => HttpResponse::Ok().json(g),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
 #[get("/users")]
-fn list_users() -> impl Responder {
-    unimplemented!()
+fn get_users(pool: web::Data<db::Pool>) -> impl Responder {
+    match db::get_all_users(&pool.get().unwrap()) {
+        Ok(gs) => HttpResponse::Ok().json(gs),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
 #[post("/users")]
-fn add_user() -> impl Responder {
-    unimplemented!()
+fn create_user(pool: web::Data<db::Pool>, json: web::Json<models::NewUser>) -> impl Responder {
+    match db::create_user(&pool.get().unwrap(), json.0) {
+        Ok(_) => HttpResponse::Created(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[get("/users/{user_id}")]
+fn get_user_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::get_user_by_id(&pool.get().unwrap(), *id) {
+        Ok(g) => HttpResponse::Ok().json(g),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[get("/users/{user_id}/groups")]
+fn get_users_groups(pool: web::Data<db::Pool>, user_id: web::Path<i32>) -> impl Responder {
+    match db::get_groups_of_user(&pool.get().unwrap(), *user_id) {
+        Ok(gs) => HttpResponse::Ok().json(gs),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
 fn main() {
@@ -75,8 +144,11 @@ fn main() {
             .wrap(Logger::default())
             .data(pool.clone())
             .service(get_groups)
-            .service(add_group)
+            .service(create_group)
             .service(get_events)
+            .service(create_event)
+            .service(get_users)
+            .service(create_user)
     })
     .bind("127.0.0.1:5000")
     .unwrap()

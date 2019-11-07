@@ -1,14 +1,33 @@
 use super::schema::*;
 use chrono::{DateTime, Utc};
-use diesel::{Insertable, Queryable, pg::Pg, serialize::{self, ToSql, IsNull, Output}, deserialize::{self, FromSql}, sql_types::Varchar};
-use serde::Serialize;
-use std::io::Write;
+use diesel::{
+    deserialize::{self, FromSql},
+    pg::Pg,
+    serialize::{self, IsNull, Output, ToSql},
+    sql_types::Varchar,
+    Insertable, Queryable,
+};
+use serde::{Deserialize, Serialize};
+use std::{io::Write, str::FromStr};
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, AsExpression)]
+#[sql_type = "Varchar"]
 #[serde(rename_all = "lowercase")]
 pub enum GroupRole {
     Admin,
     Member,
+}
+
+impl FromStr for GroupRole {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "admin" => Ok(GroupRole::Admin),
+            "member" => Ok(GroupRole::Member),
+            _ => Err(()),
+        }
+    }
 }
 
 impl ToSql<Varchar, Pg> for GroupRole {
@@ -31,31 +50,41 @@ impl FromSql<Varchar, Pg> for GroupRole {
     }
 }
 
-#[derive(Queryable, Serialize)]
+impl Queryable<Varchar, Pg> for GroupRole {
+    type Row = <String as Queryable<Varchar, Pg>>::Row;
+
+    fn build(row: Self::Row) -> Self {
+        GroupRole::from_str(&row).unwrap()
+    }
+}
+
+#[derive(Queryable, Serialize, Identifiable)]
+#[table_name = "events"]
 pub struct Event {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
     pub cover_img: Option<String>,
     pub address: String,
-    pub loc_name: String,
+    pub loc_name: Option<String>,
     pub lat: f64,
     pub long: f64,
 }
 
-#[derive(Insertable)]
+#[derive(Deserialize, Insertable)]
 #[table_name = "events"]
-pub struct NewEvent<'a> {
-    pub name: &'a str,
-    pub description: Option<&'a str>,
-    pub cover_img: Option<&'a str>,
-    pub address: &'a str,
-    pub loc_name: Option<&'a str>,
+pub struct NewEvent {
+    pub name: String,
+    pub description: Option<String>,
+    pub cover_img: Option<String>,
+    pub address: String,
+    pub loc_name: Option<String>,
     pub lat: f64,
     pub long: f64,
 }
 
-#[derive(Queryable, Serialize)]
+#[derive(Queryable, Serialize, Identifiable)]
+#[table_name = "groups"]
 pub struct Group {
     pub id: i32,
     pub name: String,
@@ -64,16 +93,27 @@ pub struct Group {
     pub cover_img: Option<String>,
 }
 
-#[derive(Insertable)]
-#[table_name = "groups"]
-pub struct NewGroup<'a> {
-    pub name: &'a str,
-    pub description: Option<&'a str>,
-    pub profile_img: Option<&'a str>,
-    pub cover_img: Option<&'a str>,
+#[derive(Queryable, Serialize)]
+pub struct PermissionedGroup {
+    pub id: i32,
+    pub name: String,
+    pub description: Option<String>,
+    pub profile_img: Option<String>,
+    pub cover_img: Option<String>,
+    pub membership_role: GroupRole,
 }
 
-#[derive(Queryable, Serialize)]
+#[derive(Deserialize, Insertable)]
+#[table_name = "groups"]
+pub struct NewGroup {
+    pub name: String,
+    pub description: Option<String>,
+    pub profile_img: Option<String>,
+    pub cover_img: Option<String>,
+}
+
+#[derive(Queryable, Serialize, Identifiable)]
+#[table_name = "users"]
 pub struct User {
     pub id: i32,
     pub username: String,
@@ -82,10 +122,30 @@ pub struct User {
     pub profile_img: Option<String>,
 }
 
-#[derive(Queryable, Serialize, Associations)]
+#[derive(Queryable, Serialize)]
+pub struct PermissionedUser {
+    pub id: i32,
+    pub username: String,
+    pub fullname: String,
+    pub email: String,
+    pub profile_img: Option<String>,
+    pub membership_role: GroupRole,
+}
+
+#[derive(Deserialize, Insertable)]
+#[table_name = "users"]
+pub struct NewUser {
+    pub username: String,
+    pub fullname: String,
+    pub email: String,
+    pub profile_img: Option<String>,
+}
+
+#[derive(Queryable, Serialize, Associations, Identifiable)]
 #[belongs_to(User)]
 #[belongs_to(Group)]
 #[belongs_to(Event)]
+#[table_name = "posts"]
 pub struct Post {
     pub id: i32,
     pub title: Option<String>,
@@ -96,11 +156,20 @@ pub struct Post {
     pub event_id: Option<i32>,
 }
 
-#[derive(Queryable, Serialize, Associations)]
+#[derive(Serialize, Associations, Identifiable, Queryable)]
 #[belongs_to(User)]
 #[belongs_to(Group)]
+#[table_name = "memberships"]
 pub struct Membership {
     pub id: i32,
+    pub user_id: i32,
+    pub group_id: i32,
+    pub membership_role: GroupRole,
+}
+
+#[derive(Deserialize, Insertable)]
+#[table_name = "memberships"]
+pub struct NewMembership {
     pub user_id: i32,
     pub group_id: i32,
     pub membership_role: GroupRole,

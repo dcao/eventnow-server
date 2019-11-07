@@ -58,10 +58,4 @@ joinable!(posts -> events (event_id));
 joinable!(posts -> groups (group_id));
 joinable!(posts -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(
-    events,
-    groups,
-    memberships,
-    posts,
-    users,
-);
+allow_tables_to_appear_in_same_query!(events, groups, memberships, posts, users,);
