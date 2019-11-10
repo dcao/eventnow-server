@@ -1,4 +1,4 @@
-use actix_web::{get, middleware::Logger, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, middleware::Logger, post, delete, web, App, HttpResponse, HttpServer, Responder};
 use diesel::prelude::PgConnection;
 use diesel::r2d2::{self, ConnectionManager};
 use serde::Deserialize;
@@ -30,6 +30,15 @@ fn create_group(pool: web::Data<db::Pool>, json: web::Json<models::NewGroup>) ->
 fn get_group_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
     match db::get_group_by_id(&pool.get().unwrap(), *id) {
         Ok(g) => HttpResponse::Ok().json(g),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[delete("/groups/{group_id}")]
+fn delete_group(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::delete_group(&pool.get().unwrap(), *id) {
+        Ok(_) => HttpResponse::Ok(),
         Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
         Err(_) => HttpResponse::InternalServerError().into(),
     }
@@ -94,6 +103,15 @@ fn get_event_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Respon
     }
 }
 
+#[delete("/events/{event_id}")]
+fn delete_event(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::delete_event(&pool.get().unwrap(), *id) {
+        Ok(_) => HttpResponse::Ok(),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
 #[get("/users")]
 fn get_users(pool: web::Data<db::Pool>) -> impl Responder {
     match db::get_all_users(&pool.get().unwrap()) {
@@ -114,6 +132,15 @@ fn create_user(pool: web::Data<db::Pool>, json: web::Json<models::NewUser>) -> i
 fn get_user_by_id(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
     match db::get_user_by_id(&pool.get().unwrap(), *id) {
         Ok(g) => HttpResponse::Ok().json(g),
+        Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
+}
+
+#[delete("/users/{user_id}")]
+fn delete_user(pool: web::Data<db::Pool>, id: web::Path<i32>) -> impl Responder {
+    match db::delete_user(&pool.get().unwrap(), *id) {
+        Ok(_) => HttpResponse::Ok(),
         Err(db::DbErr::NotFound) => HttpResponse::NoContent().into(),
         Err(_) => HttpResponse::InternalServerError().into(),
     }
@@ -149,6 +176,9 @@ fn main() {
             .service(create_event)
             .service(get_users)
             .service(create_user)
+            .service(delete_event)
+            .service(delete_group)
+            .service(delete_user)
     })
     .bind("127.0.0.1:5000")
     .unwrap()

@@ -31,6 +31,56 @@ pub fn create_group(conn: &PgConnection, group: NewGroup) -> DbResult<()> {
         .execute(conn)?;
     Ok(())
 }
+/// Delete a post
+pub fn delete_post(conn: &PgConnection, post_id: i32) -> DbResult<()> {
+    use super::schema::posts;
+
+    diesel::delete(posts::table.filter(posts::id.eq(post_id))).execute(conn)?;
+    Ok(())
+}
+
+/// Delete a group
+pub fn delete_group(conn: &PgConnection, group_id: i32) -> DbResult<()> {
+    use super::schema::groups;
+    use super::schema::posts;
+    // Delete the group
+    diesel::delete(groups::table.filter(groups::id.eq(group_id))).execute(conn)?;
+    // Delete posts associated with the group
+    diesel::delete(posts::table.filter(posts::id.eq(group_id))).execute(conn)?;
+    Ok(())
+    
+}
+
+/// Delete an event
+pub fn delete_event(conn: &PgConnection, event_id: i32) -> DbResult<()> {
+    use super::schema::events;
+
+    diesel::delete(events::table.filter(events::id.eq(event_id))).execute(conn)?;
+    Ok(())
+}
+
+/// Delete a user
+pub fn delete_user(conn: &PgConnection, user_id: i32) -> DbResult<()> {
+    use super::schema::users;
+    use super::schema::posts;
+
+    // Delete the user
+    diesel::delete(users::table.filter(users::id.eq(user_id))).execute(conn)?;
+    // Updates deleted user's posts id to that of anonymous
+    let target = posts::table.filter(posts::user_id.eq(Some(user_id)));
+    diesel::update(target).set(posts::user_id.eq::<Option<i32>>(None)).execute(conn)?;
+    // Deletes the user memberships
+    delete_memberships(conn, user_id)?;
+    Ok(())
+}
+
+/// Delete memberships
+pub fn delete_memberships(conn: &PgConnection, user_id: i32) -> DbResult<()> {
+    use super::schema::memberships;
+    // Delete memberships
+    diesel::delete(memberships::table.filter(memberships::user_id.eq(user_id))).execute(conn)?;
+    Ok(())
+}
 
 /// Get all events
 pub fn get_all_events(conn: &PgConnection) -> DbResult<Vec<Event>> {

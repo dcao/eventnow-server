@@ -151,7 +151,7 @@ pub struct Post {
     pub title: Option<String>,
     pub body: String,
     pub created_at: DateTime<Utc>,
-    pub user_id: i32,
+    pub user_id: Option<i32>,
     pub group_id: i32,
     pub event_id: Option<i32>,
 }
